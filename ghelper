@@ -4,18 +4,640 @@
 # Set up
 
 set -e
-SCRIPT_PATH="$(cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P)"
-source "$SCRIPT_PATH/scripts/common"
+
+RED="$(tput setaf 1)"
+GREEN="$(tput setaf 2)"
+BLUE="$(tput setaf 4)"
+NORMAL="$(tput sgr0)"
+UNDERLINE="$(tput smul)"
+
+
+# Check if required software is installed
+
+if ! command -v git &> /dev/null; then
+  echo "git could not be found."
+  exit 1
+fi
+
+if ! command -v gh &> /dev/null; then
+  echo "GitHub CLI (gh) could not be found."
+  exit 1
+fi
+
+if ! command -v tput &> /dev/null; then
+  echo "tput could not be found."
+  exit 1
+fi
+
+
+# Set colors
+
+RED="$(tput setaf 1)"
+GREEN="$(tput setaf 2)"
+BLUE="$(tput setaf 4)"
+NORMAL="$(tput sgr0)"
+UNDERLINE="$(tput smul)"
+
+
+# Helper functions
+
+root_help() {
+  echo ""
+  echo "Usage: ghelper [subcommand] [options]"
+  echo ""
+  echo "Subcommand:"
+  echo ""
+  echo "commit: Create a new branch, add/delete files, and open/merge a pull request."
+  echo "exec:   Execute a shell command in multiple git repositories."
+  echo ""
+  echo "-h, --help: Show this help message."
+  exit 0
+}
+
+print_versions() {
+  printf "%sgit version%s: $(git --version)\n" "$UNDERLINE" "$NORMAL"
+  printf "%sGitHub CLI version%s: " "$UNDERLINE" "$NORMAL" && echo $(gh --version)
+}
+
+determine_main_branch() {
+  local GH_BRANCH_NAME="$1"
+
+  printf "   > Determining main branch:\n"
+  if [[ -n "$GH_BRANCH_NAME" ]]; then
+    printf "      > Using main branch %s%s%s, set by user.\n" "$BLUE" "$GH_BRANCH_NAME" "$NORMAL"
+    local MAIN_BRANCH_FOR_REPO="$GH_BRANCH_NAME"
+  else
+    for MAIN_BRANCH in main master trunk develop; do
+      printf "      > Checking if %s%s%s exists in remote.\n" "$BLUE" "$MAIN_BRANCH" "$NORMAL"
+      local MAIN_BRANCH_GREP_MATCH=$(git branch -r | { grep "origin/$MAIN_BRANCH" || true; })
+      if [[ -n "$MAIN_BRANCH_GREP_MATCH" ]]; then
+          printf "      > Found branch %s%s%s.\n" "$BLUE" "$MAIN_BRANCH" "$NORMAL"
+          local MAIN_BRANCH_FOR_REPO="$MAIN_BRANCH"
+      else
+        printf "      > Branch %s%s%s not found in remote, continuing.\n" "$BLUE" "$MAIN_BRANCH" "$NORMAL"
+      fi
+    done
+
+    if [[ -z "$MAIN_BRANCH_FOR_REPO" ]]; then
+      printf "   > %sNo main branch found, exiting.%s" "$RED" "$NORMAL"
+      exit 1
+    fi
+  fi
+
+  printf "   > Going with branch %s%s%s.\n" "$BLUE" "$MAIN_BRANCH_FOR_REPO" "$NORMAL"
+  git checkout "$MAIN_BRANCH_FOR_REPO" -q
+}
+
+clone_repository() {
+  local WORKING_DIR="$1"
+  local GIT_REPO="$2"
+  local GIT_REPO_DIR="$3"
+
+  set +e
+  printf "   > Cloning repository %s%s%s to %s%s%s.\n" "$BLUE" "$GIT_REPO" "$NORMAL" "$BLUE" "$GIT_REPO_DIR" "$NORMAL"
+  local GH_CLONE_ERROR_LOG="$(mktemp)"
+  if ! gh repo clone "$GIT_REPO" "$GIT_REPO_DIR" 2> "$GH_CLONE_ERROR_LOG"; then
+    printf "   > %sPush failed:\n\n" "$RED"
+    cat "$GH_CLONE_ERROR_LOG"
+    printf "%s" "$NORMAL"
+    exit 1
+  fi
+  set -e
+
+  cd "$GIT_REPO_DIR"
+}
 
 
 # Subcommands
 
+subc_commit() {
+  local SUBCOMMAND='commit'
+  local POSITIONAL_ARGS=()
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -a|--add)
+        local ADD_FILES="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -d|--delete)
+        local DEL_FILES="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -b|--new-branch-name)
+        local GH_NEW_BRANCH_NAME="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -m|--commit-message)
+        local COMMIT_MESSAGE="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -c|--continue-on-missing-file)
+        local CONTINUE_ON_MISSING_FILE=1
+        shift # past argument
+        ;;
+      -B|--base-branch-name)
+        local GH_BASE_BRANCH_NAME="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -P|--no-push)
+        local GH_NO_PUSH=1
+        shift # past argument
+        ;;
+      -O|--no-pull-request)
+        local GH_NO_PR=1
+        shift # past argument
+        ;;
+      -M|--merge)
+        local GH_MERGE=1
+        shift # past argument
+        ;;
+      -S|--squash)
+        local GH_SQUASH=1
+        shift # past argument
+        ;;
+      -R|--rebase)
+        local GH_REBASE=1
+        shift # past argument
+        ;;
+      -C|--no-clean)
+        local NO_CLEAN=1
+        shift # past argument
+        ;;
+      --debug)
+        local DEBUG=1
+        shift # past argument
+        ;;
+      -h|--help)
+        local HELP=1
+        shift # past argument
+        ;;
+      -*|--*)
+        echo "$SUBCOMMAND: Unknown option $1."
+        exit 1
+        ;;
+      *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+  done
+
+  set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+  if [[ -n "$HELP" ]]; then
+    echo ""
+    echo "Usage: ghelper $SUBCOMMAND <list of git repositories>"
+    echo ""
+    echo "Options:"
+    echo ""
+    echo "  -a, --add <src1=dest1,src2=dest2,src3=dest3,...>   Files to add. Source files are assumed to be in the same directory as the script is run from."
+    echo "  -d, --delete <file1,file2,...>                     Files to delete."
+    echo "  -b, --new-branch-name <name>                       Name of the branch to create."
+    echo "  -m, --commit-message <message>                     Commit message."
+    echo "  -c, --continue-on-missing-file                     Continue even if a file to delete is missing."
+    echo "  -B, --base-branch-name <name>                      Name of the base branch to create the new branch from. If not provided, the script will try to find a main branch (main, master, trunk, develop) in the repository."
+    echo "  -P, --no-push                                      Do not push to origin."
+    echo "  -O, --no-pull-request                              Do not open a pull request."
+    echo "  -M, --merge                                        Automatically merge pull requests. Uses merge commit by default, can be combined with --squash or --rebase."
+    echo "  -S, --squash                                       Squash commits when merging pull requests."
+    echo "  -R, --rebase                                       Rebase commits when merging pull requests."
+    echo "  -C, --no-clean                                     Do not clean up working directory."
+    echo "  -h, --help                                         Show this help message."
+    echo "  --debug                                            Enable debug mode."
+    echo ""
+    echo "Examples:"
+    echo ""
+    echo "1. Create a new branch and add a file to it:"
+    echo "   ghelper $SUBCOMMAND --add renovate.json=.github/renovate.json --new-branch-name ci/add-renovate 3lvia/cool-system"
+    echo ""
+    echo "2. Create a new branch, add multiple files to it, and delete another file:"
+    echo "   ghelper $SUBCOMMAND --add yarn.lock=frontend/yarn.lock,package.json=frontend/package.json --delete frontend/package-lock.json --new-branch-name build/use-yarn 3lvia/cool-system"
+    echo ""
+    echo "3. Create a new branch, add a file to it, use a custom commit message and automatically merge using squash:"
+    echo "   ghelper $SUBCOMMAND --add .github/workflows/ci.yml --new-branch-name ci/add-ci --commit-message 'Add CI workflow' --merge --squash 3lvia/cool-system"
+    echo ""
+    echo "4. Create a new branch, add a file to it, and do not push to origin using repository list file:"
+    echo "   ghelper $SUBCOMMAND --add .github/workflows/ci.yml --new-branch-name ci/add-ci --no-push repositories.txt"
+    echo ""
+
+    exit 0
+  fi
+
+
+  # Required arguments
+
+  if [[ -n $1 ]]; then
+    local GIT_REPOS="$1"
+  else
+    echo "$SUBCOMMAND: No list of git repositories provided; got: $1"
+    exit 1
+  fi
+
+  if [[ -z $ADD_FILES ]]; then
+    echo "$SUBCOMMAND: No files to add provided; use -a or --add."
+    exit 1
+  fi
+
+  if [[ -z $GH_NEW_BRANCH_NAME ]]; then
+    echo "$SUBCOMMAND: No new branch name provided; ues -b or --new-branch-name."
+    exit 1
+  fi
+
+
+  # Debug mode
+
+  if [[ -n $DEBUG ]]; then
+    printf "\n\n"
+    printf "%sDebug mode enabled:%s\n" "$BLUE" "$NORMAL"
+    printf "%sSUBCOMMAND%s: %s\n" "$UNDERLINE" "$NORMAL" "$SUBCOMMAND"
+    printf "%sADD_FILES%s: %s\n" "$UNDERLINE" "$NORMAL" "$ADD_FILES"
+    printf "%sDEL_FILES%s: %s\n" "$UNDERLINE" "$NORMAL" "$DEL_FILES"
+    printf "%sGH_NEW_BRANCH_NAME%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_NEW_BRANCH_NAME"
+    printf "%sCOMMIT_MESSAGE%s: %s\n" "$UNDERLINE" "$NORMAL" "$COMMIT_MESSAGE"
+    printf "%sCONTINUE_ON_MISSING_FILE%s: %s\n" "$UNDERLINE" "$NORMAL" "$CONTINUE_ON_MISSING_FILE"
+    printf "%sGH_BASE_BRANCH_NAME%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_BASE_BRANCH_NAME"
+    printf "%sGH_NO_PUSH%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_NO_PUSH"
+    printf "%sGH_NO_PR%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_NO_PR"
+    printf "%sGH_MERGE%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_MERGE"
+    printf "%sGH_SQUASH%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_SQUASH"
+    printf "%sGH_REBASE%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_REBASE"
+    printf "%sNO_CLEAN%s: %s\n" "$UNDERLINE" "$NORMAL" "$NO_CLEAN"
+    printf "%sGIT_REPOS%s: %s\n" "$UNDERLINE" "$NORMAL" "$GIT_REPOS"
+    print_versions
+    printf "\n\n"
+  fi
+
+
+  # Determine list of git repositories
+
+  if [ -f "$GIT_REPOS" ]; then
+    printf "> Reading list of git repositories from file %s%s%s.\n" "$BLUE" "$GIT_REPOS" "$NORMAL"
+    local GIT_REPOS="$(cat $GIT_REPOS)"
+  else
+    printf "> Reading list of git repositories from argument as comma separated list.\n"
+    local GIT_REPOS=$(echo "$GIT_REPOS" | tr "," "\n")
+  fi
+
+  if [[ -z "$GIT_REPOS" ]]; then
+    echo "> %sNo git repositories found.%s"
+    exit 1
+  fi
+
+  # Create working directory
+
+  local SCRIPT_PATH="$(pwd)"
+  local WORKING_DIR=$(mktemp -d)
+  printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+  cd "$WORKING_DIR"
+
+  # Process each repository in list
+  printf "\n"
+  for GIT_REPO in $GIT_REPOS; do
+    printf "> Processing repository %s%s%s:\n" "$BLUE" "$GIT_REPO" "$NORMAL"
+
+
+    # Clone repository and setup directory
+
+    local GIT_REPO_DIR=$WORKING_DIR/"$(basename $GIT_REPO)"
+    clone_repository "$WORKING_DIR" "$GIT_REPO" "$GIT_REPO_DIR"
+
+
+    # Determine main branch
+
+    determine_main_branch "$GH_BASE_BRANCH_NAME"
+
+
+    # Add files
+
+    printf "   > Proceeding to add files:\n"
+    local ADD_FILES=$(echo "$ADD_FILES" | tr "," "\n")
+    for ADD_FILE in $ADD_FILES; do
+      local ADD_FILE_SPLIT=$(echo "$ADD_FILE" | tr "=" "\n")
+      local ADD_SRC_FILE=$(echo "$ADD_FILE_SPLIT" | head -n1)
+      local ADD_DEST_FILE=$(echo "$ADD_FILE_SPLIT" | tail -n1)
+
+      local ADD_SRC_FILE_PATH="$SCRIPT_PATH/$ADD_SRC_FILE"
+      local ADD_DEST_FILE_PATH="$GIT_REPO_DIR/$ADD_DEST_FILE"
+
+      printf "       > Checking if source file %s%s%s exists.\n" "$BLUE" "$ADD_SRC_FILE" "$NORMAL"
+      if [[ ! -f "$ADD_SRC_FILE_PATH" ]]; then
+        printf "       > %sSource file %s%s%s does not exist.%s\n" "$RED" "$BLUE" "$ADD_SRC_FILE" "$RED" "$NORMAL"
+        exit 1
+      fi
+
+      printf "       > Adding %s%s%s using from source file %s%s%s.\n" "$GREEN" "$ADD_DEST_FILE" "$NORMAL" "$BLUE" "$ADD_SRC_FILE" "$NORMAL"
+      cp "$ADD_SRC_FILE_PATH" "$ADD_DEST_FILE_PATH" && git add "$ADD_DEST_FILE_PATH"
+    done
+
+
+    # Delete files
+
+    if [[ -z "$DEL_FILES" ]]; then
+      printf "   > No files to delete provided, skipping.\n"
+    else
+      printf "   > Proceeding to delete files:\n"
+      local DEL_FILES=$(echo "$DEL_FILES" | tr "," "\n")
+      for DEL_FILE in $DEL_FILES; do
+        local DEL_FILE_PATH="$GIT_REPO_DIR/$DEL_FILE"
+
+        printf "       > Checking if file %s%s%s exists.\n" "$BLUE" "$DEL_FILE" "$NORMAL"
+        if [[ ! -f "$DEL_FILE_PATH" ]]; then
+          if [[ -n "$CONTINUE_ON_MISSING_FILE" ]]; then
+            printf "       > %sFile %s%s%s does not exist, continuing.%s\n" "$RED" "$BLUE" "$DEL_FILE" "$RED" "$NORMAL"
+            continue
+          else
+            printf "       > %sFile %s%s%s does not exist, exiting.%s\n" "$RED" "$BLUE" "$DEL_FILE" "$RED" "$NORMAL"
+            exit 1
+          fi
+        fi
+
+        printf "       > Deleting %s%s%s.\n" "$RED" "$DEL_FILE" "$NORMAL"
+        rm -f "$DEL_FILE_PATH" && git add "$DEL_FILE_PATH"
+      done
+    fi
+
+
+    # Checkout branch and commit changes
+
+    printf "   > Checking out new branch %s%s%s.\n" "$BLUE" "$GH_NEW_BRANCH_NAME" "$NORMAL"
+    git checkout -b "$GH_NEW_BRANCH_NAME" -q
+
+    local COMMIT_BODY="This commit was automatically generated by [ghelper](https://github.com/3lvia/ghelper)."
+
+    if [[ -n "$COMMIT_MESSAGE" ]]; then
+      printf "   > Committing changes, using custom commit message...\n"
+      git commit -m "$COMMIT_MESSAGE" -m "$COMMIT_BODY" -q
+    else
+      printf "   > Committing changes, using default commit message...\n"
+      git commit -m "Update files" -m "$COMMIT_BODY" -q
+    fi
+
+    printf "   > Changes committed.\n"
+
+
+    # Push to origin
+
+    if [[ -n "$GH_NO_PUSH" ]]; then
+      printf "   > Pushing to origin disabled.\n"
+      set -e
+      continue
+    fi
+
+
+    set +e # disable exit on error for push and pr creation
+
+    printf "   > Pushing to origin...\n"
+    local GH_PUSH_ERROR_LOG="$(mktemp)"
+    if ! git push -qu origin --no-progress "$GH_NEW_BRANCH_NAME" 2> "$GH_PUSH_ERROR_LOG"; then
+      printf "   > %sPush failed:\n\n" "$RED"
+      cat "$GH_PUSH_ERROR_LOG"
+      printf "%s" "$NORMAL"
+      exit 1
+    fi
+
+
+    # Create pull request
+
+    if [[ -n "$GH_NO_PR" ]]; then
+      printf "   > Pull request creation disabled.\n"
+      set -e
+      continue
+    fi
+
+    printf "   > Creating pull request...\n"
+    local GH_PR_CREATE_ERROR_LOG="$(mktemp)"
+    local GIT_CURRENT_BRANCH="$(git branch --show-current)"
+    if ! local GH_PR_CREATE_URL=$(gh pr create -B "$GIT_CURRENT_BRANCH" -a '@me' -f 2> "$GH_PR_CREATE_ERROR_LOG"); then
+     printf "      > %sPull request creation failed:\n\n" "$RED"
+      cat "$GH_PR_CREATE_ERROR_LOG"
+      printf "%s" "$NORMAL"
+      exit 1
+    fi
+
+    printf "   > Pull request created.\n"
+
+
+    # Merge pull request
+
+    if [[ -z "$GH_MERGE" ]]; then
+      printf "   > Merging pull request disabled, see pull request at %s%s%s.\n" "$BLUE" "$GH_PR_CREATE_URL" "$NORMAL"
+      set -e
+      continue
+    fi
+
+    local GH_MERGE_ARG='-m'
+    if [[ -n "$GH_SQUASH" ]]; then
+      printf "   > Pull request will be merged using squash.\n"
+      local GH_MERGE_ARG='-s'
+    elif [[ -n "$GH_REBASE" ]]; then
+      printf "   > Pull request will be merged using rebase.\n"
+      local GH_MERGE_ARG='-r'
+    else
+      printf "   > Pull request will be merged using merge commit.\n"
+    fi
+
+    printf "   > Merging pull request...\n"
+    local GH_PR_MERGE_ERROR_LOG="$(mktemp)"
+    if ! gh pr merge -d --auto "$GH_MERGE_ARG" 2> "$GH_PR_MERGE_ERROR_LOG"; then
+      printf "   > %sPull request merge failed:\n\n" "$RED"
+      cat "$GH_PR_MERGE_ERROR_LOG"
+      printf "%s" "$NORMAL"
+      exit 1
+    fi
+    printf "   > Pull request merged.\n"
+
+    set -e
+    printf "\n"
+  done
+
+
+  # Clean up (or not)
+
+  if [[ -n "$NO_CLEAN" ]]; then
+    echo "> Done, not cleaning up."
+  else
+    echo "> Done, cleaning up."
+    rm -rf "$WORKING_DIR"
+  fi
+}
+
+subc_exec() {
+  local SUBCOMMAND='exec'
+  local POSITIONAL_ARGS=()
+
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -x|--exec)
+        local CMD_EXECUTE="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -l|--log-file)
+        local CMD_LOG_FILE="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -b|--branch)
+        local GH_BRANCH_NAME="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -C|--no-clean)
+        local NO_CLEAN=1
+        shift # past argument
+        ;;
+      --debug)
+        local DEBUG=1
+        shift # past argument
+        ;;
+      -h|--help)
+        local HELP=1
+        shift # past argument
+        ;;
+      -*|--*)
+        echo "Unknown option $1."
+        exit 1
+        ;;
+      *)
+        POSITIONAL_ARGS+=("$1") # save positional arg
+        shift # past argument
+        ;;
+    esac
+  done
+
+  set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+  if [[ -n "$HELP" ]]; then
+    echo ""
+    echo "Usage: ghelper $SUBCOMMAND [options] <list of git repositories>"
+    echo ""
+    echo "Options:"
+    echo ""
+    echo "  -x, --exec <command>        Command to execute."
+    echo "  -l, --log-file <file>       Log file to write output to."
+    echo "  -b, --branch <name>         Name of the branch to checkout."
+    echo "  -C, --no-clean              Do not clean up working directory."
+    echo "  -h, --help                  Show this help message."
+    echo "  --debug                     Enable debug mode."
+    echo ""
+    echo "Examples:"
+    echo ""
+    echo "1. Check if the file 'README.md' exists in the main branch of the repository '3lvia/ghelper':"
+    echo "   ghelper $SUBCOMMAND -x 'ls README.md' 3lvia/ghelper"
+    echo ""
+    echo "2. Run a Trivy scan on the repositories '3lvia/core-terraform' and '3lvia/runtimeservice-terraform':"
+    echo "   ghelper $SUBCOMMAND -x 'trivy --severity HIGH .' 3lvia/core-terraform,3lvia/runtimeservice-terraform"
+    echo ""
+
+    exit 0
+  fi
+
+
+  # Required arguments
+
+  if [[ -n $1 ]]; then
+    local GIT_REPOS="$1"
+  else
+    echo "$SUBCOMMAND: No list of git repositories provided; got: $1"
+    exit 1
+  fi
+
+
+  # Debug mode
+
+  if [[ -n $DEBUG ]]; then
+    printf "\n\n"
+    printf "%sDebug mode enabled:%s\n" "$BLUE" "$NORMAL"
+    printf "%sSUBCOMMAND%s: %s\n" "$UNDERLINE" "$NORMAL" "$SUBCOMMAND"
+    printf "%sCMD_EXECUTE%s: %s\n" "$UNDERLINE" "$NORMAL" "$CMD_EXECUTE"
+    printf "%sCMD_LOG_FILE%s: %s\n" "$UNDERLINE" "$NORMAL" "$CMD_LOG_FILE"
+    printf "%sGH_BRANCH_NAME%s: %s\n" "$UNDERLINE" "$NORMAL" "$GH_BRANCH_NAME"
+    printf "%sNO_CLEAN%s: %s\n" "$UNDERLINE" "$NORMAL" "$NO_CLEAN"
+    printf "%sGIT_REPOS%s: %s\n" "$UNDERLINE" "$NORMAL" "$GIT_REPOS"
+    print_versions
+    printf "\n\n"
+  fi
+
+
+  # Determine list of git repositories
+
+  if [ -f "$GIT_REPOS" ]; then
+    printf "> Reading list of git repositories from file %s%s%s.\n" "$BLUE" "$GIT_REPOS" "$NORMAL"
+    local GIT_REPOS="$(cat $GIT_REPOS)"
+  else
+    printf "> Reading list of git repositories from argument as comma separated list.\n"
+    local GIT_REPOS=$(echo "$GIT_REPOS" | tr "," "\n")
+  fi
+
+  if [[ -z "$GIT_REPOS" ]]; then
+    echo "> %sNo git repositories found.%s"
+    exit 1
+  fi
+
+  # Create working directory
+
+  local WORKING_DIR=$(mktemp -d)
+  printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+  cd "$WORKING_DIR"
+
+
+  # Process each repository in list
+
+  printf "\n"
+  for GIT_REPO in $GIT_REPOS; do
+    printf "> Processing repository %s%s%s:\n" "$BLUE" "$GIT_REPO" "$NORMAL"
+
+
+    # Clone repository and setup directory
+
+    local GIT_REPO_DIR=$WORKING_DIR/"$(basename $GIT_REPO)"
+    clone_repository "$WORKING_DIR" "$GIT_REPO" "$GIT_REPO_DIR"
+
+
+    # Determine main branch
+
+    determine_main_branch "$GH_BRANCH_NAME"
+
+
+    # Execute command
+
+    set +e # Disable exit on error
+    printf "   > Executing command %s'%s'%s.\n" "$BLUE" "$CMD_EXECUTE" "$NORMAL"
+    if [[ -n "$CMD_LOG_FILE" ]]; then
+      printf "   > Appending output to %s%s%s.\n" "$BLUE" "$CMD_LOG_FILE" "$NORMAL"
+      echo "Repository: $GIT_REPO" >> "$CMD_LOG_FILE"
+      $CMD_EXECUTE >> "$CMD_LOG_FILE" 2>&1
+    else
+      $CMD_EXECUTE
+    fi
+    set -e # Enable exit on error
+
+    printf "\n"
+  done
+
+
+  # Clean up (or not)
+
+  if [[ -n "$NO_CLEAN" ]]; then
+    echo "> Done, not cleaning up."
+  else
+    echo "> Done, cleaning up."
+    rm -rf "$WORKING_DIR"
+  fi
+}
+
 case $1 in
   commit)
-    "$SCRIPT_PATH/scripts/commit" "${@:2}"
+    subc_commit "${@:2}"
     ;;
   exec)
-    "$SCRIPT_PATH/scripts/exec" "${@:2}"
+    subc_exec "${@:2}"
     ;;
   *)
     root_help

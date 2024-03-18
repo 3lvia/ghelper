@@ -52,7 +52,7 @@ Options:
 
   -a, --add <src1=dest1,src2=dest2,src3=dest3,...>   Files to add. Source files are assumed to be in the same directory as the script is run from.
   -d, --delete <file1,file2,...>                     Files to delete.
-  -b, --branch-name <name>                           Name of the branch to create.
+  -b, --new-branch-name <name>                       Name of the branch to create.
   -m, --commit-message <message>                     Commit message.
   -c, --continue-on-missing-file                     Continue even if a file to delete is missing.
   -B, --base-branch-name <name>                      Name of the base branch to create the new branch from. If not provided, the script will try to find a main branch (main, master, trunk, develop) in the repository.
@@ -68,16 +68,16 @@ Options:
 Examples:
 
 1. Create a new branch and add a file to it:
-   ghelper commit --add renovate.json=.github/renovate.json --branch-name ci/add-renovate 3lvia/cool-system
+   ghelper commit --add renovate.json=.github/renovate.json --new-branch-name ci/add-renovate 3lvia/cool-system
 
 2. Create a new branch, add multiple files to it, and delete another file:
-   ghelper commit --add yarn.lock=frontend/yarn.lock,package.json=frontend/package.json --delete frontend/package-lock.json --branch-name build/use-yarn 3lvia/cool-system
+   ghelper commit --add yarn.lock=frontend/yarn.lock,package.json=frontend/package.json --delete frontend/package-lock.json --new-branch-name build/use-yarn 3lvia/cool-system
 
 3. Create a new branch, add a file to it, use a custom commit message and automatically merge using squash:
-   ghelper commit --add .github/workflows/ci.yml --branch-name ci/add-ci --commit-message 'Add CI workflow' --merge --squash 3lvia/cool-system
+   ghelper commit --add .github/workflows/ci.yml --new-branch-name ci/add-ci --commit-message 'Add CI workflow' --merge --squash 3lvia/cool-system
 
 4. Create a new branch, add a file to it, and do not push to origin using repository list file:
-   ghelper commit --add .github/workflows/ci.yml --branch-name ci/add-ci --no-push repositories.txt
+   ghelper commit --add .github/workflows/ci.yml --new-branch-name ci/add-ci --no-push repositories.txt
 ```
 
 ### Exec
