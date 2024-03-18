@@ -65,7 +65,7 @@ if [[ -n "$HELP" ]]; then
   echo "   ghelper exec -x 'ls README.md' 3lvia/ghelper"
   echo ""
   echo "2. Run a Trivy scan on the repositories '3lvia/core-terraform' and '3lvia/runtimeservice-terraform':"
-  echo "   ghelper exec -x 'trivy --exit-code 1 --severity HIGH --no-progress --ignore-unfixed .' 3lvia/core-terraform,3lvia/runtimeservice-terraform"
+  echo "   ghelper exec -x 'trivy --severity HIGH .' 3lvia/core-terraform,3lvia/runtimeservice-terraform"
   echo ""
 
   exit 0

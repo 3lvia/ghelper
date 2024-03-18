@@ -80,5 +80,5 @@ Examples:
    ghelper exec -x 'ls README.md' 3lvia/ghelper
 
 2. Run a Trivy scan on the repositories '3lvia/core-terraform' and '3lvia/runtimeservice-terraform':
-   ghelper exec -x 'trivy --exit-code 1 --severity HIGH --no-progress --ignore-unfixed .' 3lvia/core-terraform,3lvia/runtimeservice-terraform
+   ghelper exec -x 'trivy config --severity HIGH .' 3lvia/core-terraform,3lvia/runtimeservice-terraform
 ```
