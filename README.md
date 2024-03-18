@@ -5,14 +5,28 @@ A simple script to help with the management of multiple GitHub repositories.
 ## Pre-requisites
 
 `git` and `gh` are required to be installed and available in the PATH.
-You must have authorized your GitHub account with `gh` by running `gh auth login`.
+
+You must also have authorized your GitHub account with `gh` by running `gh auth login`.
 
 ## Usage
 
 ```
 ./ghelper --help
 
-Usage: ghelper [options] <list of git repositories>
+Usage: ghelper [subcommand] [options]
+
+Subcommand:
+
+commit: Create a new branch, add/delete files, and open/merge a pull request.
+exec:   Execute a shell command in multiple git repositories.
+
+-h, --help: Show this help message.
+```
+
+### Commit
+
+```
+Usage: ghelper commit <list of git repositories>
 
 Options:
 
@@ -34,14 +48,37 @@ Options:
 Examples:
 
 1. Create a new branch and add a file to it:
-   ghelper --add renovate.json=.github/renovate.json --branch-name ci/add-renovate 3lvia/cool-system
+   ghelper commit --add renovate.json=.github/renovate.json --branch-name ci/add-renovate 3lvia/cool-system
 
 2. Create a new branch, add multiple files to it, and delete another file:
-   ghelper --add yarn.lock=frontend/yarn.lock,package.json=frontend/package.json --delete frontend/package-lock.json --branch-name build/use-yarn 3lvia/cool-system
+   ghelper commit --add yarn.lock=frontend/yarn.lock,package.json=frontend/package.json --delete frontend/package-lock.json --branch-name build/use-yarn 3lvia/cool-system
 
 3. Create a new branch, add a file to it, use a custom commit message and automatically merge using squash:
-   ghelper --add .github/workflows/ci.yml --branch-name ci/add-ci --commit-message 'Add CI workflow' --merge --squash 3lvia/cool-system
+   ghelper commit --add .github/workflows/ci.yml --branch-name ci/add-ci --commit-message 'Add CI workflow' --merge --squash 3lvia/cool-system
 
 4. Create a new branch, add a file to it, and do not push to origin using repository list file:
-   ghelper --add .github/workflows/ci.yml --branch-name ci/add-ci --no-push repositories.txt
- ```
+   ghelper commit --add .github/workflows/ci.yml --branch-name ci/add-ci --no-push repositories.txt
+```
+
+### Exec
+
+```
+Usage: ghelper exec [options] <list of git repositories>
+
+Options:
+
+  -x, --exec <command>        Command to execute.
+  -l, --log-file <file>       Log file to write output to.
+  -b, --branch <name>         Name of the branch to checkout.
+  -C, --no-clean              Do not clean up working directory.
+  -h, --help                  Show this help message.
+  --debug                     Enable debug mode.
+
+Examples:
+
+1. Check if the file 'README.md' exists in the main branch of the repository '3lvia/ghelper':
+   ghelper exec -x 'ls README.md' 3lvia/ghelper
+
+2. Run a Trivy scan on the repositories '3lvia/core-terraform' and '3lvia/runtimeservice-terraform':
+   ghelper exec -x 'trivy --exit-code 1 --severity HIGH --no-progress --ignore-unfixed .' 3lvia/core-terraform,3lvia/runtimeservice-terraform
+```
