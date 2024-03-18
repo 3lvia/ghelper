@@ -8,11 +8,27 @@ A simple script to help with the management of multiple GitHub repositories.
 
 You must also have authorized your GitHub account with `gh` by running `gh auth login`.
 
+## Installation
+
+```bash
+git clone git@github.com:3lvia/ghelper.git
+```
+
+```bash
+cd ghelper
+```
+
+```bash
+./ghelper
+```
+
 ## Usage
 
+```bash
+$ ./ghelper --help
 ```
-./ghelper --help
 
+```
 Usage: ghelper [subcommand] [options]
 
 Subcommand:
@@ -24,6 +40,10 @@ exec:   Execute a shell command in multiple git repositories.
 ```
 
 ### Commit
+
+```bash
+$ ./ghelper commit --help
+```
 
 ```
 Usage: ghelper commit <list of git repositories>
@@ -61,6 +81,10 @@ Examples:
 ```
 
 ### Exec
+
+```bash
+$ ./ghelper exec --help
+```
 
 ```
 Usage: ghelper exec [options] <list of git repositories>
