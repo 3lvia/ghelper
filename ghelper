@@ -292,10 +292,17 @@ subc_commit() {
 
   if [[ -n "$CUSTOM_WORKING_DIR" ]]; then
     local WORKING_DIR="$CUSTOM_WORKING_DIR"
+
+    if [[ ! -d "$WORKING_DIR" ]]; then
+      printf "> Working-directory %s%s%s does not exist, creating it.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+      mkdir -p "$WORKING_DIR"
+    fi
+
     printf "> Using working-directory %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
     cd "$WORKING_DIR"
   else
     local WORKING_DIR=$(mktemp -d)
+
     printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
     cd "$WORKING_DIR"
   fi
@@ -597,10 +604,17 @@ subc_exec() {
 
   if [[ -n "$CUSTOM_WORKING_DIR" ]]; then
     local WORKING_DIR="$CUSTOM_WORKING_DIR"
+
+    if [[ ! -d "$WORKING_DIR" ]]; then
+      printf "> Working-directory %s%s%s does not exist, creating it.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+      mkdir -p "$WORKING_DIR"
+    fi
+
     printf "> Using working-directory %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
     cd "$WORKING_DIR"
   else
     local WORKING_DIR=$(mktemp -d)
+
     printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
     cd "$WORKING_DIR"
   fi
