@@ -1,0 +1,21 @@
+name: ShellCheck
+
+on:
+  push:
+    branches: [trunk]
+  pull_request:
+    branches: [trunk]
+
+jobs:
+  shellcheck:
+    name: 'ShellCheck'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install Shellcheck
+      run: sudo apt-get install shellcheck
+
+    - name: Run ShellCheck
+      run: shellcheck ghelper
