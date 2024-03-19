@@ -2,7 +2,6 @@
 
 set -e
 
-
 # Check if required software is installed
 
 if ! command -v git &> /dev/null; then
@@ -23,11 +22,11 @@ fi
 
 # Set colors
 
-RED="$(tput setaf 1)"
-GREEN="$(tput setaf 2)"
-BLUE="$(tput setaf 4)"
-NORMAL="$(tput sgr0)"
-UNDERLINE="$(tput smul)"
+RED="$(TERM=xterm tput setaf 1)"
+GREEN="$(TERM=xterm tput setaf 2)"
+BLUE="$(TERM=xterm tput setaf 4)"
+NORMAL="$(TERM=xterm tput sgr0)"
+UNDERLINE="$(TERM=xterm tput smul)"
 
 
 # Helper functions
