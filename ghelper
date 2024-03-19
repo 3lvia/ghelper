@@ -1,15 +1,6 @@
 #!/bin/bash
 
-
-# Set up
-
 set -e
-
-RED="$(tput setaf 1)"
-GREEN="$(tput setaf 2)"
-BLUE="$(tput setaf 4)"
-NORMAL="$(tput sgr0)"
-UNDERLINE="$(tput smul)"
 
 
 # Check if required software is installed
@@ -140,6 +131,11 @@ subc_commit() {
         local CONTINUE_ON_MISSING_FILE=1
         shift # past argument
         ;;
+      -w|--working-dir)
+        local CUSTOM_WORKING_DIR="$2"
+        shift # past argument
+        shift # past value
+        ;;
       -B|--base-branch-name)
         local GH_BASE_BRANCH_NAME="$2"
         shift # past argument
@@ -201,6 +197,7 @@ subc_commit() {
     echo "  -b, --new-branch-name <name>                       Name of the branch to create."
     echo "  -m, --commit-message <message>                     Commit message."
     echo "  -c, --continue-on-missing-file                     Continue even if a file to delete is missing."
+    echo "  -w, --working-dir <path>                           Custom working directory. Implies --no-clean."
     echo "  -B, --base-branch-name <name>                      Name of the base branch to create the new branch from. If not provided, the script will try to find a main branch (main, master, trunk, develop) in the repository."
     echo "  -P, --no-push                                      Do not push to origin."
     echo "  -O, --no-pull-request                              Do not open a pull request."
@@ -289,12 +286,20 @@ subc_commit() {
     exit 1
   fi
 
+
   # Create working directory
 
-  local SCRIPT_PATH="$(pwd)"
-  local WORKING_DIR=$(mktemp -d)
-  printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
-  cd "$WORKING_DIR"
+  local SCRIPT_PATH="$(pwd)" # save current dir
+
+  if [[ -n "$CUSTOM_WORKING_DIR" ]]; then
+    local WORKING_DIR="$CUSTOM_WORKING_DIR"
+    printf "> Using working-directory %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+    cd "$WORKING_DIR"
+  else
+    local WORKING_DIR=$(mktemp -d)
+    printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+    cd "$WORKING_DIR"
+  fi
 
   # Process each repository in list
   printf "\n"
@@ -459,7 +464,7 @@ subc_commit() {
 
   # Clean up (or not)
 
-  if [[ -n "$NO_CLEAN" ]]; then
+  if [[ -n "$NO_CLEAN" || -n "$CUSTOM_WORKING_DIR" ]]; then
     echo "> Done, not cleaning up."
   else
     echo "> Done, cleaning up."
@@ -485,6 +490,11 @@ subc_exec() {
         ;;
       -b|--branch)
         local GH_BRANCH_NAME="$2"
+        shift # past argument
+        shift # past value
+        ;;
+      -w|--working-dir)
+        local CUSTOM_WORKING_DIR="$2"
         shift # past argument
         shift # past value
         ;;
@@ -522,6 +532,7 @@ subc_exec() {
     echo "  -x, --exec <command>        Command to execute."
     echo "  -l, --log-file <file>       Log file to write output to."
     echo "  -b, --branch <name>         Name of the branch to checkout."
+    echo "  -w, --working-dir <path>    Custom working directory. Implies --no-clean."
     echo "  -C, --no-clean              Do not clean up working directory."
     echo "  -h, --help                  Show this help message."
     echo "  --debug                     Enable debug mode."
@@ -534,6 +545,8 @@ subc_exec() {
     echo "2. Run a Trivy scan on the repositories '3lvia/core-terraform' and '3lvia/runtimeservice-terraform':"
     echo "   ghelper $SUBCOMMAND -x 'trivy --severity HIGH .' 3lvia/core-terraform,3lvia/runtimeservice-terraform"
     echo ""
+    echo "3. Run a custom shell script on the repositories listed in 'repositories.txt', and don't clean up the working directory:"
+    echo "   ghelper $SUBCOMMAND -x 'sh ./my-script.sh' -w /home/user/my-working-dir repositories.txt"
 
     exit 0
   fi
@@ -580,11 +593,18 @@ subc_exec() {
     exit 1
   fi
 
+
   # Create working directory
 
-  local WORKING_DIR=$(mktemp -d)
-  printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
-  cd "$WORKING_DIR"
+  if [[ -n "$CUSTOM_WORKING_DIR" ]]; then
+    local WORKING_DIR="$CUSTOM_WORKING_DIR"
+    printf "> Using working-directory %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+    cd "$WORKING_DIR"
+  else
+    local WORKING_DIR=$(mktemp -d)
+    printf "> Creating working-directory in %s%s%s.\n" "$BLUE" "$WORKING_DIR" "$NORMAL"
+    cd "$WORKING_DIR"
+  fi
 
 
   # Process each repository in list
@@ -624,7 +644,7 @@ subc_exec() {
 
   # Clean up (or not)
 
-  if [[ -n "$NO_CLEAN" ]]; then
+  if [[ -n "$NO_CLEAN" || -n "$CUSTOM_WORKING_DIR" ]]; then
     echo "> Done, not cleaning up."
   else
     echo "> Done, cleaning up."

@@ -55,6 +55,7 @@ Options:
   -b, --new-branch-name <name>                       Name of the branch to create.
   -m, --commit-message <message>                     Commit message.
   -c, --continue-on-missing-file                     Continue even if a file to delete is missing.
+  -w, --working-dir <path>                           Custom working directory. Implies --no-clean.
   -B, --base-branch-name <name>                      Name of the base branch to create the new branch from. If not provided, the script will try to find a main branch (main, master, trunk, develop) in the repository.
   -P, --no-push                                      Do not push to origin.
   -O, --no-pull-request                              Do not open a pull request.
@@ -78,6 +79,7 @@ Examples:
 
 4. Create a new branch, add a file to it, and do not push to origin using repository list file:
    ghelper commit --add .github/workflows/ci.yml --new-branch-name ci/add-ci --no-push repositories.txt
+
 ```
 
 ### Exec
@@ -94,6 +96,7 @@ Options:
   -x, --exec <command>        Command to execute.
   -l, --log-file <file>       Log file to write output to.
   -b, --branch <name>         Name of the branch to checkout.
+  -w, --working-dir <path>    Custom working directory. Implies --no-clean.
   -C, --no-clean              Do not clean up working directory.
   -h, --help                  Show this help message.
   --debug                     Enable debug mode.
@@ -104,5 +107,8 @@ Examples:
    ghelper exec -x 'ls README.md' 3lvia/ghelper
 
 2. Run a Trivy scan on the repositories '3lvia/core-terraform' and '3lvia/runtimeservice-terraform':
-   ghelper exec -x 'trivy config --severity HIGH .' 3lvia/core-terraform,3lvia/runtimeservice-terraform
+   ghelper exec -x 'trivy --severity HIGH .' 3lvia/core-terraform,3lvia/runtimeservice-terraform
+
+3. Run a custom shell script on the repositories listed in 'repositories.txt', and don't clean up the working directory:
+   ghelper exec -x 'sh ./my-script.sh' -w /home/user/my-working-dir repositories.txt
 ```
