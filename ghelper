@@ -49,7 +49,7 @@ print_versions() {
   printf "%sGitHub CLI version%s: " "$UNDERLINE" "$NORMAL" && echo $(gh --version)
 }
 
-determine_main_branch() {
+checkout_main_branch() {
   local GH_BRANCH_NAME="$1"
 
   printf "   > Determining main branch:\n"
@@ -319,9 +319,10 @@ subc_commit() {
     clone_repository "$WORKING_DIR" "$GIT_REPO" "$GIT_REPO_DIR"
 
 
-    # Determine main branch
+    # Checkout main branch
 
-    determine_main_branch "$GH_BASE_BRANCH_NAME"
+    checkout_main_branch "$GH_BASE_BRANCH_NAME"
+    GH_MAIN_BRANCH="$(git branch --show-current)"
 
 
     # Add files
@@ -433,8 +434,7 @@ subc_commit() {
 
     printf "   > Creating pull request...\n"
     local GH_PR_CREATE_ERROR_LOG="$(mktemp)"
-    local GIT_CURRENT_BRANCH="$(git branch --show-current)"
-    if ! local GH_PR_CREATE_URL=$(gh pr create -B "$GIT_CURRENT_BRANCH" -a '@me' -f 2> "$GH_PR_CREATE_ERROR_LOG"); then
+    if ! GH_PR_CREATE_URL=$(gh pr create -B "$GH_MAIN_BRANCH" -a '@me' -f 2> "$GH_PR_CREATE_ERROR_LOG"); then
      printf "      > %sPull request creation failed:\n\n" "$RED"
       cat "$GH_PR_CREATE_ERROR_LOG"
       printf "%s" "$NORMAL"
@@ -643,9 +643,9 @@ subc_exec() {
     clone_repository "$WORKING_DIR" "$GIT_REPO" "$GIT_REPO_DIR"
 
 
-    # Determine main branch
+    # Checkout main branch
 
-    determine_main_branch "$GH_BRANCH_NAME"
+    checkout_main_branch "$GH_BRANCH_NAME"
 
 
     # Execute command
