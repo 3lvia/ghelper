@@ -640,7 +640,6 @@ subc_exec() {
 
     # Execute command
 
-    set +e # Disable exit on error
     printf "   > Executing command %s'%s'%s.\n" "$BLUE" "$CMD_EXECUTE" "$NORMAL"
     if [[ -n "$CMD_LOG_FILE" ]]; then
       printf "   > Appending output to %s%s%s.\n" "$BLUE" "$CMD_LOG_FILE" "$NORMAL"
@@ -649,7 +648,6 @@ subc_exec() {
     else
       $CMD_EXECUTE
     fi
-    set -e # Enable exit on error
 
     printf "\n"
   done
