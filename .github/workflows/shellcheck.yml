@@ -14,8 +14,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install Shellcheck
-      run: sudo apt-get install shellcheck
+    - name: Install ShellCheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install shellcheck
 
     - name: Run ShellCheck
       run: shellcheck ghelper
