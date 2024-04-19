@@ -4,7 +4,7 @@ A simple script to help with the management of multiple GitHub repositories.
 
 ## Pre-requisites
 
-`git` and `gh` are required to be installed and available in the PATH.
+`git` and `gh` (GitHub CLI) are required to be installed and available in the PATH.
 
 You must also have authorized your GitHub account with `gh` by running `gh auth login`.
 
