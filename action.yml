@@ -1,0 +1,12 @@
+name: 'Install ghelper'
+description: 'Install ghelper to use in your workflow.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install ghelper
+      shell: bash
+      run: |
+        wget -q https://raw.githubusercontent.com/3lvia/ghelper/trunk/ghelper
+        mv ./ghelper /usr/local/bin/ghelper
+        chmod +x /usr/local/bin/ghelper
