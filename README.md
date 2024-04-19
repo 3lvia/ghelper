@@ -34,7 +34,7 @@ Usage: ghelper [subcommand] [options]
 Subcommand:
 
 commit: Create a new branch, add/delete files, and open/merge a pull request.
-exec:   Execute a shell command in multiple git repositories.
+exec:   Execute a shell command and log the output.
 
 -h, --help: Show this help message.
 ```

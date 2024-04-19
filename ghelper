@@ -11,7 +11,7 @@ root_help() {
   echo "Subcommand:"
   echo ""
   echo "commit: Create a new branch, add/delete files, and open/merge a pull request."
-  echo "exec:   Execute a shell command in multiple git repositories."
+  echo "exec:   Execute a shell command and log the output."
   echo ""
   echo "-h, --help: Show this help message."
   exit 0
