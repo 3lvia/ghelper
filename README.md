@@ -112,3 +112,30 @@ Examples:
 3. Run a custom shell script on the repositories listed in 'repositories.txt', and don't clean up the working directory:
    ghelper exec -x 'sh ./my-script.sh' -w /home/user/my-working-dir repositories.txt
 ```
+
+### Usage in GitHub Actions
+
+You can also use `ghelper` in GitHub Actions workflows, by first running the action `3lvia/ghelper` to install the script.
+The script will then be available in the PATH and can be used in subsequent steps.
+
+The GitHub CLI requires a token to be able to interact with the GitHub API.
+The token can be passed to the script using the `GH_TOKEN` environment variable.
+
+```yaml
+name: ghelper
+
+on:
+  pull_request:
+    branches: [trunk]
+
+jobs:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Install ghelper
+      uses: 3lvia/ghelper@trunk
+
+    - name: Run ghelper
+      run: ghelper exec -x 'cat LICENSE' 3lvia/ghelper
+      env:
+        GH_TOKEN: ${{ github.token }}
+```

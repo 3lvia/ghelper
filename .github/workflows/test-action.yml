@@ -1,0 +1,21 @@
+name: Test action
+
+on:
+  pull_request:
+    branches: [trunk]
+
+jobs:
+  test_action:
+    name: Test action
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ghelper
+        uses: ./
+
+      - name: Run ghelper
+        run: ghelper exec -x 'cat LICENSE' 3lvia/ghelper
+        env:
+          GH_TOKEN: ${{ github.token }}
