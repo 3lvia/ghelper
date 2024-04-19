@@ -112,3 +112,22 @@ Examples:
 3. Run a custom shell script on the repositories listed in 'repositories.txt', and don't clean up the working directory:
    ghelper exec -x 'sh ./my-script.sh' -w /home/user/my-working-dir repositories.txt
 ```
+
+### Usage in GitHub Actions
+
+```yaml
+name: ghelper
+
+on:
+  pull_request:
+    branches: [trunk]
+
+jobs:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Install ghelper
+      uses: 3lvia/ghelper@trunk
+
+    - name: Run ghelper
+      run: ghelper exec -x 'cat LICENSE' 3lvia/ghelper
+```

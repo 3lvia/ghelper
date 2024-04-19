@@ -1,0 +1,14 @@
+name: Test action
+
+on:
+  pull_request:
+    branches: [trunk]
+
+jobs:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Install ghelper
+      uses: 3lvia/ghelper@feat/action
+
+    - name: Run ghelper
+      run: ghelper exec -x 'cat LICENSE' 3lvia/ghelper
